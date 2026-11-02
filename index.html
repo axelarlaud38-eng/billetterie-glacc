@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Billetterie GLACC</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 420px; margin: 40px auto; padding: 0 16px; }
+    h2 { text-align: center; }
+    .choix { display: flex; gap: 10px; margin-bottom: 20px; }
+    button.menu { flex: 1; padding: 14px; border: 2px solid #4472C4; background: white;
+                  color: #4472C4; border-radius: 8px; cursor: pointer; font-size: 15px; }
+    button.menu.active { background: #4472C4; color: white; }
+    .section { display: none; }
+    .section.visible { display: block; }
+    input[type=text] { width: 100%; padding: 10px; font-size: 16px; box-sizing: border-box;
+                        border: 1px solid #ccc; border-radius: 6px; margin-bottom: 10px; }
+    button.valider { width: 100%; padding: 12px; background: #4472C4; color: white;
+                      border: none; border-radius: 6px; font-size: 15px; cursor: pointer; }
+    button.valider:disabled { opacity: 0.7; cursor: not-allowed; }
+    .message { margin-top: 12px; padding: 10px; border-radius: 6px; text-align: center; }
+    .erreur { background: #fdecea; color: #c0392b; }
+    .interdit { background: #fff3cd; color: #856404; }
+    .petit { font-size: 11px; color: #856404; text-align: center; margin-top: 6px; }
+    .spinner {
+      display: inline-block; width: 12px; height: 12px;
+      border: 2px solid #fff; border-top-color: transparent;
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+      vertical-align: middle; margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <h2>Billetterie GLACC</h2>
+
+  <div class="choix">
+    <button class="menu" onclick="afficher('majeur', this)">Je suis majeur</button>
+    <button class="menu" onclick="afficher('mineur', this)">Mineur / Parrain</button>
+  </div>
+
+  <div id="section-majeur" class="section">
+    <input type="text" id="codeInput" placeholder="Entrez votre code place"
+           autocomplete="off" autocapitalize="characters">
+    <button class="valider" id="btnValider" onclick="valider()">Valider</button>
+    <div id="message"></div>
+  </div>
+
+  <div id="section-mineur" class="section">
+    <div class="message interdit">
+      L'événement n'est pas autorisé aux mineurs à ce jour.
+    </div>
+    <div class="petit">L'enfreindre pourrait engager de lourdes sanctions.</div>
+  </div>
+
+  <script>
+    var API_URL = 'https://script.google.com/macros/s/AKfycbxNlPtXLnjucXrE8Y0SmZS_7u8n5_uQxIvLE3uVXlrEelh1hFPwFUFusFV8-QI8Ledr/exec';
+    var enCours = false;
+
+    function afficher(type, bouton) {
+      document.querySelectorAll('.menu').forEach(function(b) { b.classList.remove('active'); });
+      document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('visible'); });
+      document.getElementById('section-' + type).classList.add('visible');
+      bouton.classList.add('active');
+    }
+
+    function reactiverBouton() {
+      enCours = false;
+      var btn = document.getElementById('btnValider');
+      btn.disabled = false;
+      btn.innerHTML = 'Valider';
+    }
+
+    function valider() {
+      if (enCours) return;
+      var code = document.getElementById('codeInput').value.trim();
+      var msgDiv = document.getElementById('message');
+      var btn = document.getElementById('btnValider');
+      msgDiv.innerHTML = '';
+      if (!code) return;
+
+      enCours = true;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Vérification...';
+
+      var controller = new AbortController();
+      var timeoutId = setTimeout(function() { controller.abort(); }, 20000);
+
+      fetch(API_URL + '?code=' + encodeURIComponent(code), { signal: controller.signal })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+          clearTimeout(timeoutId);
+          if (res.success && /^https?:\/\//.test(res.url)) {
+            btn.innerHTML = '<span class="spinner"></span> Redirection...';
+            window.location.href = res.url;
+          } else {
+            msgDiv.innerHTML = '<div class="message erreur">Le code n\'est pas attribué</div>';
+            reactiverBouton();
+          }
+        })
+        .catch(function() {
+          clearTimeout(timeoutId);
+          msgDiv.innerHTML = '<div class="message erreur">Connexion lente ou impossible, réessayez.</div>';
+          reactiverBouton();
+        });
+    }
+
+    document.getElementById('codeInput').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') valider();
+    });
+  </script>
+</body>
+</html>
